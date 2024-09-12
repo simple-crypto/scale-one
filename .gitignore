@@ -1,3 +1,5 @@
 .pyc
 utils_scale/__pycache__
+.ipynb_checkpoints
+scale-venv
 
