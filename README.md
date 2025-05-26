@@ -9,14 +9,11 @@ The following dependencies are required in order to run the notebook
 + [Python3](https://www.python.org/downloads/) for installation (version >= 3.10 tested)
 + Python3 venv package (must be installed independently as `python3-venv` on Debian/Ubuntu, installed by default elsewhere)
 
-Besides, the dataset used in this tutorial can be found [here](https://enigma.elen.ucl.ac.be/dsm/sharing/VMx9J3Xkc)
-
 ## Getting started
 
 In order to open the notebook, please follow these instructions
 
 1. Clone this repo, containing the framework.
-1. [Download](https://enigma.elen.ucl.ac.be/dsm/sharing/VMx9J3Xkc) the dataset and unzip it into the framework directory.
 1. Setup the virtual environment and install the dependencies
 
     + On Linux
