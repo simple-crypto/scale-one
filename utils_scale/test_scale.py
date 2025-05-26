@@ -16,6 +16,16 @@ MY_COLORS = [
         "xkcd:pink",
         ]
 
+def print_install_success():
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from scipy.stats import norm
+    from scalib.metrics import SNR
+    from utils_scale.utils_aes import Sbox, HW
+    from utils_scale import utils_files
+    import datetime
+    print("Your installation seems successful :)")
+
 def log_start(test_id, log=True):
     if log:
         print("##### START TEST: {} #####".format(test_id))

@@ -1,6 +1,26 @@
 import numpy as np
 
+# Version 2025
+def load_dataset(datafile_path):
+    """
+    Open to file and load all the data fields from it. 
+    """
+    with open(datafile_path, 'rb') as f:
+        coll = np.load(f, allow_pickle=True)
+        traces = coll["traces"].astype(np.float64)
+        pts = coll["pts"]
+        ks = coll["ks"]
+        cts = coll["cts"]
+    return dict(
+        traces=traces,
+        pts=pts,
+        ks=ks,
+        cts=cts
+    )
 
+
+
+#############
 def load_datasets_profiled_setting(fp_train, fp_validation):
     # Open the training file and load all the data fields from it. 
     with open(fp_train, 'rb') as f:
