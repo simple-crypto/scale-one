@@ -188,13 +188,13 @@ def _cpa_parts_exploration_compute(dataset_file, bindex, std=[0]):
     )
 
 def print_cpa_parts_report(res):
-    print(f"Using time index {res["poi"]} [corr. max {res["maxcorr"]}]")
+    print(f'Using time index {res["poi"]} [corr. max {res["maxcorr"]}]')
     for i,stde in enumerate(res['stds']):
-        print(f"---> For std_noise = {stde}")
-        print(f"correlation:{res["corr"][i]}")
-        print(f"covariance:{res["covs"][i]}")
-        print(f"std_model:{res["std_m"][i]}")
-        print(f"std_traces:{res["std_t"][i]}")
+        print(f'---> For std_noise = {stde}')
+        print(f'correlation:{res["corr"][i]}')
+        print(f'covariance:{res["covs"][i]}')
+        print(f'std_model:{res["std_m"][i]}')
+        print(f'std_traces:{res["std_t"][i]}')
         print()
 
 def cpa_parts_exploration(dataset_file, bindex, std=[0], plot=False):
