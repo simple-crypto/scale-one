@@ -1,16 +1,27 @@
 import numpy as np
+from pathlib import Path
+
 
 # Version 2025
-def load_dataset(datafile_path):
+RELATIVE_DIR_FILES_T="scale-dataset-25"
+VALIDATION_DS=[f"./{RELATIVE_DIR_FILES_T}/validation{i}/data.npz" for i in range(5)]
+TRAINING_DS=[f"./{RELATIVE_DIR_FILES_T}/training{i}/data.npz" for i in range(1)]
+TTEST_KF_DS=f"./{RELATIVE_DIR_FILES_T}/ttest-kf/data.npz"
+TTEST_PF_DS=f"./{RELATIVE_DIR_FILES_T}/ttest-pf/data.npz"
+
+def load_dataset(datafile_path, traces_dtype=np.float64, cropping=None):
     """
     Open to file and load all the data fields from it. 
     """
     with open(datafile_path, 'rb') as f:
         coll = np.load(f, allow_pickle=True)
-        traces = coll["traces"].astype(np.float64)
+        traces = coll["traces"].astype(traces_dtype)
         pts = coll["pts"]
         ks = coll["ks"]
         cts = coll["cts"]
+    if cropping is not None:
+        [start, end] = cropping
+        traces = traces[:,start:end]
     return dict(
         traces=traces,
         pts=pts,
@@ -18,7 +29,10 @@ def load_dataset(datafile_path):
         cts=cts
     )
 
-
+def assert_file_exists(f):
+    fp = Path(f)
+    exp_path = "{}/{}".format(Path.cwd(), f)
+    assert fp.is_file(), f"The file '{exp_path}' does not exist. Please verify the location of the dataset." 
 
 #############
 def load_datasets_profiled_setting(fp_train, fp_validation):

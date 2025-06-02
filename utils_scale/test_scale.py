@@ -8,6 +8,7 @@ from utils_scale import utils_files
 
 import datetime
 
+# Version 2025
 MY_COLORS = [
         "xkcd:blue",
         "xkcd:green",
@@ -72,6 +73,269 @@ def styledstr(st, background=None, color=None):
 
     return "{}{}\033[0m".format(bgcolors[background], st)
 
+def test_mean(f_mean):
+    Ntr = 100
+    Ns = 3000
+    traces = np.random.randint(0,2**16-1,[Ntr,Ns])
+    ref_mean = np.mean(traces,axis=0)
+    ret = f_mean(traces)
+    assert ret.shape==(Ns,), "Wrong shape ('{}' returned instead of '{}')".format(ret.shape, (Ns,))
+    assert np.allclose(ref_mean, f_mean(traces)), "Sadly, your implementation does not seem to work properly."
+    print("Good job! Your implementation seems correct :)")
+
+def test_dist(f_dist):
+    Ns = 3000
+    t0 = np.random.randint(0,2**16-1,size=Ns)
+    t1 = np.random.randint(0,2**16-1,size=Ns)
+    ref_dist = np.sqrt((t0-t1)**2)
+    ret = f_dist(t0,t1)
+    assert ret.shape==(Ns,), "Wrong shape ('{}' returned instead of '{}')".format(ret.shape, (Ns,))
+    assert np.allclose(ref_dist, f_dist(t0,t1)), "Sadly, your implementation does not seem to work properly."
+    print("Good job! Your implementation seems correct :)")
+
+def test_sbox_output(f_test):
+    N = 1000
+    pts = np.random.randint(0,256,[N,16])
+    ks = np.random.randint(0,256,[N,16])
+    ref = Sbox[pts^ks]
+    ret = f_test(pts,ks)
+    assert ret.shape==(N,pts.shape[1]), "Wrong shape ('{}' returned instead of '{}')".format(ret.shape, (N,pts.shape[1]))
+    assert (ref==ret).all()
+    print("Good job! Your implementation seems correct :)")
+
+def test_filter_traces_sbox_output(f_test):
+    Ns = 3000
+    N = 1000
+    pts = np.random.randint(0,256,[N,16])
+    ks = np.random.randint(0,256,[N,16])
+    traces = np.random.randint(0,2**16-1,[N,Ns])
+    bindexes=[3,7,11]
+    bvalues=[119,0,7]
+    for bindex in bindexes:
+        for bvalue in bvalues:
+            ref = traces[Sbox[pts[:,bindex] ^ ks[:,bindex]]==bvalue,:]
+            ret = f_test(traces, pts, ks, bindex, bvalue)
+            assert (ref==ret).all(), "Sadly, your implementation does not seem to work properly."
+    print("Good job! Your implementation seems correct :)")
+
+def test_covariance(f_test):
+    N = 1000
+    nv = 5
+    ls = np.random.randint(0,2**16-1,[N,nv])
+    ms = np.random.randint(0,2**16-1,[N,nv])
+    ## Compute the reference
+    lc = ls - np.mean(ls,axis=0)
+    mc = ms - np.mean(ms,axis=0)
+    ref = np.mean(lc*mc,axis=0)
+    ret = f_test(ls,ms)
+    assert (ref==ret).all(), "Sadly, your implementation does not seem to work properly."
+    print("Good job! Your implementation seems correct :)")
+
+def test_std(f_test):
+    N = 1000
+    nv = 5
+    ls = np.random.randint(0,2**16-1,[N,nv])
+    ref = np.std(ls, axis=0)
+    ret = f_test(ls)
+    assert (ref==ret).all(), "Sadly, your implementation does not seem to work properly."
+    print("Good job! Your implementation seems correct :)")
+
+def ref_pearson_corr(x,y):
+    xc = x - np.mean(x, axis=0)
+    yc = y - np.mean(y, axis=0)
+    cov = np.mean(xc*yc, axis=0)
+    x_std = np.std(x,axis=0)
+    y_std = np.std(y,axis=0)
+    return cov / (x_std * y_std)
+
+def test_pearson_corr(f_test):
+    Ns = 3000
+    N = 1000
+    t0 = np.random.randint(0,2**16-1,[N,Ns])
+    t1 = np.random.randint(0,2**16-1,[N,Ns])
+    ret = f_test(t0,t1)
+    ref = ref_pearson_corr(t0,t1)
+    assert (ref==ret).all(), "Sadly, your implementation does not seem to work properly."
+    print("Good job! Your implementation seems correct :)")
+
+def test_HW_sbox_output(f_test):
+    N = 1000
+    pts = np.random.randint(0,256,size=N,dtype=np.uint8)
+    ks = np.random.randint(0,256,size=N,dtype=np.uint8)
+    ## 
+    ref = HW[Sbox[pts ^ks]]
+    ret = f_test(pts, ks)
+    assert ret.shape==(N,), "Wrong shape ('{}' returned instead of '{}')".format(ret.shape, (N,pts.shape[1]))
+    assert (ref==ret).all(), "Sadly, your implementation does not seem to work properly."
+    print("Good job! Your implementation seems correct :)")
+
+def ref_corr_HW_traces_outSB(traces, pts_bytes, k_bytes):
+    pAKSB = Sbox[pts_bytes ^ k_bytes]
+    # Compute the HW
+    HW_pAKSB = HW[pAKSB]
+    # Replicate the model for each time sample of the trace
+    # Compute correlation
+    corrv = ref_pearson_corr(traces,np.tile(HW_pAKSB[:,np.newaxis],(1,traces.shape[1])))
+    return corrv
+
+def test_corr_HW_traces_outSB(f_test):
+    Ns = 12000
+    N = 1000
+    pts = np.random.randint(0,256,size=N)
+    ks = np.random.randint(0,256,size=N)
+    traces = np.random.randint(0,2**16-1,[N,Ns])
+    ## 
+    ref = ref_corr_HW_traces_outSB(traces, pts, ks)
+    ret = f_test(traces, pts, ks)
+    assert ret.shape==(Ns,), "Wrong shape ('{}' returned instead of '{}')".format(ret.shape, (N,pts.shape[1]))
+    assert (ref==ret).all(), "Sadly, your implementation does not seem to work properly."
+    print("Good job! Your implementation seems correct :)")
+    
+def ref_empirical_model_single_class(traces, var_labels, label):
+    return np.mean(traces[var_labels==label],axis=0)
+
+def test_empirical_model_single_class(f_test):
+    Ns = 12000
+    N = 1000
+    nclasses = 16
+    vlabels = np.random.randint(0,nclasses,size=N)
+    labels = np.arange(nclasses)[:nclasses//2]
+    traces = np.random.randint(0,2**16-1,[N,Ns])
+    for l in labels:
+        ref = ref_empirical_model_single_class(traces, vlabels, l)
+        ret = f_test(traces, vlabels, l)
+        assert ret.shape==(Ns,), "Wrong shape ('{}' returned instead of '{}')".format(ret.shape, (Ns,))
+        assert (ref==ret).all(), "Sadly, your implementation does not seem to work properly."
+    print("Good job! Your implementation seems correct :)")
+
+def ref_cpa_empirical_model_sbox_out(traces, labels, nclasses):
+    # Allocate memory
+    models = np.zeros([labels.shape[1], nclasses, traces.shape[1]],dtype=np.float64)
+    for vi in range(labels.shape[1]):
+        for ci in range(nclasses):
+            models[vi, ci, :] = ref_empirical_model_single_class(traces, labels[:,vi], ci)
+    return models
+
+def test_cpa_empirical_model_sbox_out(f_test):
+    Ns = 12000
+    N = 1000
+    nclasses = 16
+    nvars = 7
+    vlabels = np.random.randint(0,nclasses,[N,nvars])
+    traces = np.random.randint(0,2**16-1,[N,Ns])
+    #
+    ref = ref_cpa_empirical_model_sbox_out(traces, vlabels, nclasses)
+    ret = f_test(traces, vlabels, nclasses)
+    assert ret.shape==(nvars,nclasses,Ns), "Wrong shape ('{}' returned instead of '{}')".format(ret.shape, (nvars,nclasses,Ns))
+    assert (ref==ret).all(), "Sadly, your implementation does not seem to work properly."
+    print("Good job! Your implementation seems correct :)")
+
+def ref_compute_byte_snr(traces, classes):
+    snr_means = np.zeros([256, traces.shape[1]])
+    snr_vars = np.zeros([256, traces.shape[1]])
+    # Iterate over each class/byte values
+    for i in range(256):
+        # Compute the mean for the associated trace for each time samples
+        snr_means[i] = np.mean(traces[classes==i,:],axis=0)
+        # Compute the variance of the samples
+        snr_vars[i] = np.var(traces[classes==i,:], axis=0)
+    # Compute the SNR
+    var_means = np.var(snr_means, axis=0)
+    mean_vars = np.mean(snr_vars, axis=0)
+    return var_means / mean_vars
+
+def test_snr_byte(f_test):
+    Ns = 12000
+    N = 2000
+    nclasses = 256
+    vlabels = np.random.randint(0,nclasses,size=N)
+    traces = np.random.randint(0,2**16-1,[N,Ns])
+    # 
+    ref = ref_compute_byte_snr(traces, vlabels)
+    ret = f_test(traces, vlabels)
+    assert ret.shape==(Ns,), "Wrong shape ('{}' returned instead of '{}')".format(ret.shape, (Ns,))
+    assert (ref==ret).all(), f"Sadly, your implementation does not seem to work properly. {ret} {ref}"
+    print("Good job! Your implementation seems correct :)")
+
+def ref_snr_scalib(traces, classes, nclasses):    
+    snrobj = SNR(nc=nclasses)
+    snrobj.fit_u(
+        traces.astype(np.int16),
+        classes.astype(np.uint16)
+    )
+    return snrobj.get_snr()
+
+def test_snr_scalib(f_test):
+    Ns = 12000
+    N = 2000
+    nvar = 7
+    nclasses = 256
+    vlabels = np.random.randint(0,nclasses,[N,nvar])
+    traces = np.random.randint(0,2**16-1,[N,Ns])
+    # 
+    ref = ref_snr_scalib(traces, vlabels, nclasses)
+    ret = f_test(traces, vlabels, nclasses)
+    assert ret.shape==(nvar,Ns), "Wrong shape ('{}' returned instead of '{}')".format(ret.shape, (Ns,))
+    assert (ref==ret).all(), f"Sadly, your implementation does not seem to work properly. {ret} {ref}"
+    print("Good job! Your implementation seems correct :)")
+
+def ref_snr_signal(traces, classes):
+    means = np.zeros([256, traces.shape[1]])
+    for i in range(256):
+        means[i] = np.mean(traces[classes==i,:],axis=0)
+    return np.var(means, axis=0)
+
+def ref_snr_noise(traces, classes):
+    vars = np.zeros([256, traces.shape[1]])
+    for i in range(256):
+        vars[i] = np.var(traces[classes==i,:], axis=0)
+    return np.mean(vars, axis=0)
+
+def test_snr_signal(f_test):
+    Ns = 12000
+    N = 2000
+    nclasses = 256
+    vlabels = np.random.randint(0,nclasses,size=N)
+    traces = np.random.randint(0,2**16-1,[N,Ns])
+    # 
+    ref = ref_snr_signal(traces, vlabels)
+    ret = f_test(traces, vlabels)
+    assert ret.shape==(Ns,), "Wrong shape ('{}' returned instead of '{}')".format(ret.shape, (Ns,))
+    assert (ref==ret).all(), f"Sadly, your implementation does not seem to work properly. {ret} {ref}"
+    print("Good job! Your implementation seems correct :)")
+
+def test_snr_noise(f_test):
+    Ns = 12000
+    N = 2000
+    nclasses = 256
+    vlabels = np.random.randint(0,nclasses,size=N)
+    traces = np.random.randint(0,2**16-1,[N,Ns])
+    # 
+    ref = ref_snr_noise(traces, vlabels)
+    ret = f_test(traces, vlabels)
+    assert ret.shape==(Ns,), "Wrong shape ('{}' returned instead of '{}')".format(ret.shape, (Ns,))
+    assert (ref==ret).all(), f"Sadly, your implementation does not seem to work properly. {ret} {ref}"
+    print("Good job! Your implementation seems correct :)")
+
+
+def ref_POI_selection_SNR(traces, classes, nclasses):
+    snrs = ref_snr_scalib(traces, classes, nclasses)
+    return np.flip(np.argsort(snrs,axis=1),axis=1)
+
+def test_POI_selection_SNR(f_test):
+    Ns = 12000
+    N = 1000
+    nclasses = 16
+    nvars = 7
+    vlabels = np.random.randint(0,nclasses,[N,nvars])
+    traces = np.random.randint(0,2**16-1,[N,Ns])
+    # Ref
+    ref = ref_POI_selection_SNR(traces, vlabels, nclasses)
+    ret = f_test(traces, vlabels, nclasses)
+    assert ret.shape==(nvars,Ns), "Wrong shape ('{}' returned instead of '{}')".format(ret.shape, (nvars,Ns))
+    assert (ref==ret).all(), f"Sadly, your implementation does not seem to work properly. {ret} {ref}"
+    print("Good job! Your implementation seems correct :)")
+
 def bytes2str(v):
     st = ""
     for e in v:
@@ -88,51 +352,7 @@ def kg2ststr(k, status):
             st = "{}{}".format(styledstr("{:02x}".format(e), background="RED"),st)
     return "0x{}".format(st)
 
-def test_cpa_single(byte_index, am_traces, pts, traces, ks, cpa_method):
-    log_start("test_cpa_single")
-    # Run your implementation
-    kbyte = cpa_method(pts[:am_traces,byte_index],traces[:am_traces])[0]
-    # Verify
-    print("Key byte recovered at index {}: 0x{:02x} (must be 0x{:02x})".format(byte_index, kbyte, ks[0,byte_index]))
-    log_end()
-
-
-def test_full_cpa(am_traces, traces, pts, ks, cpa_method): 
-    log_start("test_full_cpa")
-    ambytes_recovered = 16*[0]
-    key_recovered = np.zeros([len(am_traces), 16],dtype=np.uint8)
-    kbytes = ["{:02x}".format(e) for e in ks[0,:]]
-    for amti, amt in enumerate(am_traces):
-        # Recover key using traces
-        key_recovered[amti] = cpa_method(
-                    traces[:amt,:],
-                    pts[:amt,:]
-                )
-        # Count the amount of recovered bytes 
-        status = key_recovered[amti] == ks[0,:]
-        ambytes_recovered[amti] = np.sum(status) 
-        # Print some stats
-        rkbytes = ["{:02x}".format(e) for e in key_recovered[amti]]
-        print("Using {} traces:".format(amt))
-        print("Key bytes:     {}".format(bytes2str(ks[0,:])))
-        print("Recovered key: {}".format(kg2ststr(key_recovered[amti], status)))
-        print("====> {}/16 bytes recovered".format(ambytes_recovered[amti]))
-    log_end()
-
-def display_correlation(correlation, example_trace, index):
-    # Plot
-    f = plt.figure()
-    ax_traces = f.add_subplot(2,1,1)
-    ax_corr = f.add_subplot(2,1,2)
-    ax_traces.plot(example_trace)
-    ax_corr.plot(correlation)
-    ax_traces.set_ylabel("Power")
-    ax_corr.set_ylabel(r'$r_{xy}$')
-    ax_corr.set_xlabel("Time samples")
-    ax_traces.set_title(r'Correlation for $y_{{{}}}=\text{{Sbox}}[p_{{{}}} \oplus k_{{{}}}]$'.format(index, index, index))
-    print("Maximum of correlation ({:.03f}) spotted at time sample index {}.".format(np.max(correlation),np.argmax(correlation)))
-
-def display_snr_sbox_output(traces, labels, byte_index, compute_byte_snr):
+def display_snr_sbox_output(traces, labels, byte_index, compute_byte_snr, subplots=[]):
     # Compute Sbox output
     ulabels = labels[:,byte_index]
     # Comptue the snr
@@ -140,15 +360,28 @@ def display_snr_sbox_output(traces, labels, byte_index, compute_byte_snr):
     # Print some stuff
     print("Max SNR ({}) found at time index {}.".format(np.max(snr), np.argmax(snr)))
     # Plot the result
-    f = plt.figure()
-    ax0 = f.add_subplot(2,1,1)
-    ax1 = f.add_subplot(2,1,2)
+    naxes = 2+len(subplots)
+    f = plt.figure(figsize=(10,6))
+    ax0 = f.add_subplot(naxes,1,1)
+    ax1 = f.add_subplot(naxes,1,2)
     ax0.plot(traces[:1,:].T)
     ax1.plot(snr)
     ax0.set_ylabel("Power")
     ax1.set_ylabel("SNR")
-    ax0.set_title(r"SNR for $y_{{{}}}=\text{{Sbox}}[p_{{{}}} \oplus k_{{{}}}]$".format(byte_index, byte_index, byte_index))
-    ax1.set_xlabel("Time")
+    ax0.set_title(r"$y_{{{}}}=\text{{Sbox}}[p_{{{}}} \oplus k_{{{}}}]$".format(byte_index, byte_index, byte_index))
+    axes = [ax0,ax1]
+    for i, (sub, lab) in enumerate(subplots):
+        ax = f.add_subplot(naxes, 1, 3+i)
+        metr = sub(traces, ulabels)
+        ax.plot(metr)
+        ax.set_ylabel(lab)
+        axes.append(ax)
+
+    axes[-1].set_xlabel("Time")
+    f.tight_layout() 
+    plt.show()
+
+
 
 def display_snr_sbox_output_SCALIB(traces, labels, indexes):
     # Compute snr
@@ -759,4 +992,7 @@ def display_ttest_result(ttest_result, example_trace, title="Ttest results"):
     ax0.set_ylabel("Power")
     ax1.set_ylabel("t-statistic")
     ax1.set_xlabel("time index")
+    f.tight_layout()
     plt.show()
+
+
