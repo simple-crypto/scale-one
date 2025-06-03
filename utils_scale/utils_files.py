@@ -9,7 +9,7 @@ TRAINING_DS=[f"./{RELATIVE_DIR_FILES_T}/training{i}/data.npz" for i in range(1)]
 TTEST_KF_DS=f"./{RELATIVE_DIR_FILES_T}/ttest-kf/data.npz"
 TTEST_PF_DS=f"./{RELATIVE_DIR_FILES_T}/ttest-pf/data.npz"
 
-def load_dataset(datafile_path, traces_dtype=np.float64, cropping=None):
+def load_dataset(datafile_path, traces_dtype=np.float64, cropping=None, seed_shuffle=None):
     """
     Open to file and load all the data fields from it. 
     """
@@ -22,12 +22,23 @@ def load_dataset(datafile_path, traces_dtype=np.float64, cropping=None):
     if cropping is not None:
         [start, end] = cropping
         traces = traces[:,start:end]
-    return dict(
+    ds = dict(
         traces=traces,
         pts=pts,
         ks=ks,
         cts=cts
     )
+    if seed_shuffle is not None:
+        apply_permutation_dataset_inplace(ds, seed=seed_shuffle)
+    return ds
+
+def apply_permutation_dataset_inplace(dataset, seed=0):
+    N = dataset['traces'].shape[0]
+    np.random.seed(seed)
+    rp = np.random.permutation(np.arange(N))
+    np.random.seed(None)
+    for f in dataset.keys():
+        dataset[f][:,:] = dataset[f][rp]
 
 def assert_file_exists(f):
     fp = Path(f)
