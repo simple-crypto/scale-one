@@ -116,9 +116,9 @@ def multivariate_gaussian_models(traces, classes, pois, ndim):
     return Lda(lda_acc, p=ndim)
 
 def multivariate_LDA_TA(traces, pts, models):
-    log2pr_sb = models.predict_proba(np.round(traces).astype(np.int16))
+    pr_sb = models.predict_proba(np.round(traces).astype(np.int16))
     # Finally, perform the ML
-    lprobas = maximum_likelihood(pts, log2pr_sb)
+    lprobas = maximum_likelihood(pts, np.log2(pr_sb))
     # return lprobas
     return lprobas
 
@@ -173,9 +173,23 @@ MY_COLORS = [
          "xkcd:pink",
          ]
 
+def tipping_point(prs, correct):
+    runner = prs.shape[0]-1
+    while np.argmax(prs[runner])==correct:
+        if runner==0:
+            break
+        else:
+            runner -= 1
+    return runner+1
+
 def display_explore_TA_univariate_result(res, use_colors=False):
     # Unpack
     (allprobs, corrprobs, qp, qas, correct_kbytes) = res
+
+    # Print some stats for the first results
+    for vi in range(allprobs.shape[2]):
+        tp = tipping_point(allprobs[0,:,vi,:],correct_kbytes[0,vi])
+        print(f'Byte {vi}: {tp} traces required')
 
     # Plot the res
     scale=0.6
@@ -190,25 +204,28 @@ def display_explore_TA_univariate_result(res, use_colors=False):
     print(allprobs.shape)
     for i in range(corrprobs.shape[2]):
         axes.append(f.add_subplot(4,4,i+1))
-        # Plot the wrong guess
-        for dsvi in range(amval):
+        # Plot the wrong guess only for the first to easu visualization
+        for dsvi in range(1):
             for b in range(nc): 
                 axes[i].plot(qas, allprobs[dsvi, :, i, b], color="xkcd:light grey")
         # Plot the valid guess
         for dsvi in range(amval):
+            udsvi = amval-1-dsvi
             if use_colors:
-                color_c = MY_COLORS[dsvi % len(MY_COLORS)]
-                txt_label = "Set {}".format(dsvi)
+                color_c = MY_COLORS[udsvi % len(MY_COLORS)]
+                txt_label = "Set {}".format(udsvi)
             else:
-                color_c = "xkcd:black"
+                if udsvi==0:
+                    color_c = "xkcd:red"
+                else:
+                    color_c = "black"
                 txt_label = None
-            plt.plot(qas, corrprobs[dsvi, :, i], color=color_c, label=txt_label)
+            plt.plot(qas, corrprobs[udsvi, :, i], color=color_c, label=txt_label)
         axes[i].set_xlabel("attack data complexity")
         axes[i].set_ylabel(r'Pr($k_{}^* | \boldsymbol{{l}}$)'.format(i))
         axes[i].set_title("Byte {}".format(i))      
         if use_colors:
             axes[i].legend()
-    f.tight_layout()
     plt.show()
 
 
