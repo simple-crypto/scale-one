@@ -71,7 +71,7 @@ def univariate_TA(traces, pts, pois, models):
     lprobas = maximum_likelihood(pts, log2pr_sb)
     return lprobas
 
-def explore_TA_univariate(dspath_train, dspaths_valid, qp, qas, clean_dataset=False):
+def explore_TA_univariate(dspath_train, dspaths_valid, qp, qas, clean_dataset=False, fn_prof=None):
     ### TRAINING phase
     # First train using the training dataset 
     ds = utils_files.load_dataset(dspath_train, seed_shuffle=0, remove_first=clean_dataset)
@@ -84,8 +84,12 @@ def explore_TA_univariate(dspath_train, dspaths_valid, qp, qas, clean_dataset=Fa
     classes = utils_aes.Sbox[ds["pts"][:qpu] ^ ds["ks"][:qpu]]
     # Compute the POIs based on your function
     pois = POI_selection_SNR(ds['traces'][:qpu], classes, 256)
+
     # Compute the models
-    models = univariate_gaussian_models(ds['traces'][:qpu], classes, pois[:,0])
+    if fn_prof is None:
+        models = univariate_gaussian_models(ds['traces'][:qpu], classes[:qpu], pois[:,0])
+    else:
+        models = fn_prof(ds['traces'][:qpu], classes[:qpu], pois[:,0])
     
     ### ONLINE Phase
     # Allocate memory for the results

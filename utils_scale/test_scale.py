@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 from scalib.metrics import SNR
+import tqdm
+import time
 
 from utils_scale.utils_aes import Sbox, HW
 from utils_scale import utils_files
@@ -779,7 +781,7 @@ def display_rank_approx_vs_exact_rank(TA_res, indexes, qa_key_ranks_results, key
         axes[fpi].legend()
         f.tight_layout()
 
-def display_rank_esti_full_key(uni_TA_res, multi_TA_res, byte_indexes, key_rank_approx):
+def display_rank_esti_full_key(uni_TA_res, multi_TA_res, byte_indexes, key_rank_approx, title2=None):
     # Unpack results
     # Here,
     # - probs of shape (n_ds_validation, nvars, 256, n_qas)
@@ -806,22 +808,25 @@ def display_rank_esti_full_key(uni_TA_res, multi_TA_res, byte_indexes, key_rank_
     kr_mul_mb = np.zeros(kr_mul.shape)
     kr_mul_Mb = np.zeros(kr_mul.shape)
     # Approximate rank on the full key
-    for fpi in range(uniTA_probs.shape[0]):
-        # Iterate over the complexity
-        for qa_i, qa in enumerate(uniTA_complexities_attack):
-            # Rank for univariate attack
-            (umb, ur, uMb) = key_rank_approx(uniTA_probs[fpi, byte_indexes, :, qa_i], uniTA_correct_kbytes[fpi,byte_indexes])
-            kr_uni[fpi, qa_i] = ur
-            kr_uni_mb[fpi, qa_i] = umb
-            kr_uni_Mb[fpi, qa_i] = uMb
-            # Rank for multivariate attack 
-            (umb, ur, uMb) = key_rank_approx(mulTA_probs[fpi, byte_indexes, :, qa_i], mulTA_correct_kbytes[fpi,byte_indexes])
-            kr_mul[fpi, qa_i] = ur
-            kr_mul_mb[fpi, qa_i] = umb
-            kr_mul_Mb[fpi, qa_i] = uMb
-        # Plot the axis
-        ax0.fill_between(uniTA_complexities_attack, kr_uni_mb[fpi], kr_uni_Mb[fpi], color=MY_COLORS[fpi % len(MY_COLORS)], alpha=.3)
-        ax1.fill_between(mulTA_complexities_attack, kr_mul_mb[fpi], kr_mul_Mb[fpi], color=MY_COLORS[fpi % len(MY_COLORS)], alpha=.3)
+    pbar_max = uniTA_probs.shape[0]*len(uniTA_complexities_attack)
+    with tqdm.tqdm(total=pbar_max, desc="Test") as pbar:
+        for fpi in range(uniTA_probs.shape[0]):
+            # Iterate over the complexity
+            for qa_i, qa in enumerate(uniTA_complexities_attack):
+                # Rank for univariate attack
+                (umb, ur, uMb) = key_rank_approx(uniTA_probs[fpi, byte_indexes, :, qa_i], uniTA_correct_kbytes[fpi,byte_indexes])
+                kr_uni[fpi, qa_i] = ur
+                kr_uni_mb[fpi, qa_i] = umb
+                kr_uni_Mb[fpi, qa_i] = uMb
+                # Rank for multivariate attack 
+                (umb, ur, uMb) = key_rank_approx(mulTA_probs[fpi, byte_indexes, :, qa_i], mulTA_correct_kbytes[fpi,byte_indexes])
+                kr_mul[fpi, qa_i] = ur
+                kr_mul_mb[fpi, qa_i] = umb
+                kr_mul_Mb[fpi, qa_i] = uMb
+                pbar.update(1)
+            # Plot the axis
+            ax0.fill_between(uniTA_complexities_attack, kr_uni_mb[fpi], kr_uni_Mb[fpi], color=MY_COLORS[fpi % len(MY_COLORS)], alpha=.3)
+            ax1.fill_between(mulTA_complexities_attack, kr_mul_mb[fpi], kr_mul_Mb[fpi], color=MY_COLORS[fpi % len(MY_COLORS)], alpha=.3)
     # Plot estimated rank on top
     for fpi in range(uniTA_probs.shape[0]):
         ax0.semilogy(uniTA_complexities_attack, kr_uni[fpi], base=2, color=MY_COLORS[fpi % len(MY_COLORS)],label="Set {}".format(fpi))
@@ -838,7 +843,11 @@ def display_rank_esti_full_key(uni_TA_res, multi_TA_res, byte_indexes, key_rank_
     ax0.set_ylabel("Key rank")
     ax1.set_ylabel("Key rank")
     ax0.set_title("{}-byte rank with univaritate TA".format(len(byte_indexes)))
-    ax1.set_title("{}-byte rank with LDA + multivariate TA".format(len(byte_indexes)))
+    if title2 is None:
+        ax1.set_title("{}-byte rank with LDA + multivariate TA".format(len(byte_indexes)))
+    else:
+        ax1.set_title(title2)
+
 
 def kfold_indexes(total_size, kfold, index):
     ksize = total_size // kfold
@@ -958,7 +967,7 @@ class ITDisplayConFig:
     def models2plot(self):
         return self.map_model
 
-def display_IT_results(byte_indexes, list_tuples_cfg, scale=1.0):
+def display_IT_results(byte_indexes, list_tuples_cfg, scale=1.0, disable_legend=False):
     # Create the config
     list_config = [ITDisplayEntry(e,k) for (k,e) in list_tuples_cfg]
     display_config = ITDisplayConFig(list_config)
@@ -977,7 +986,8 @@ def display_IT_results(byte_indexes, list_tuples_cfg, scale=1.0):
             if cfg.res["mB"] is not None:
                 axes[i].fill_between(cfg.res["qt_s"], cfg.res["mB"][i,:], cfg.res["MB"][i,:], color=cfg.color, alpha=0.3)
             axes[i].plot(cfg.res["qt_s"], cfg.res["it"][i,:], color=cfg.color, linestyle=cfg.linestyle, label=cfg.label)
-        axes[i].legend()
+        if not(disable_legend):
+            axes[i].legend()
         axes[i].set_ylabel("IT metric [bits]")
         axes[i].set_xlabel("training data complexity")
         axes[i].set_title("byte index {}".format(i))
