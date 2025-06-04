@@ -781,6 +781,9 @@ def display_rank_approx_vs_exact_rank(TA_res, indexes, qa_key_ranks_results, key
 
 def display_rank_esti_full_key(uni_TA_res, multi_TA_res, byte_indexes, key_rank_approx):
     # Unpack results
+    # Here,
+    # - probs of shape (n_ds_validation, nvars, 256, n_qas)
+    # - correct_kbytes of shape (n_ds_validation, nvars)
     (uniTA_probs, uniTA_correct_kbytes, uniTA_complexities_attack) = uni_TA_res
     uniTA_probs = zero2negligeable(uniTA_probs)
     (mulTA_probs, mulTA_correct_kbytes, mulTA_complexities_attack) = multi_TA_res
@@ -791,7 +794,7 @@ def display_rank_esti_full_key(uni_TA_res, multi_TA_res, byte_indexes, key_rank_
     ax_sx_inch = 5
     ax_sy_inch = 3
     figsize=(2*ax_sx_inch, 1*ax_sy_inch)
-    f = plt.figure("TArankfull",figsize=figsize)
+    f = plt.figure(figsize=figsize)
     ax0 = f.add_subplot(1,2,1)
     ax1 = f.add_subplot(1,2,2)
     # Allocate memory
@@ -955,7 +958,7 @@ class ITDisplayConFig:
     def models2plot(self):
         return self.map_model
 
-def display_IT_results(byte_indexes, list_tuples_cfg):
+def display_IT_results(byte_indexes, list_tuples_cfg, scale=1.0):
     # Create the config
     list_config = [ITDisplayEntry(e,k) for (k,e) in list_tuples_cfg]
     display_config = ITDisplayConFig(list_config)
@@ -964,8 +967,8 @@ def display_IT_results(byte_indexes, list_tuples_cfg):
     # Plot the res
     ax_sx_inch = 5
     ax_sy_inch = 3
-    figsize=(4*ax_sx_inch, 4*ax_sy_inch)
-    f = plt.figure("TAqares",figsize=figsize)
+    figsize=(4*ax_sx_inch*scale, 4*ax_sy_inch*scale)
+    f = plt.figure(figsize=figsize)
     axes = []
     for i in byte_indexes:
         axes.append(f.add_subplot(4,4,i+1))
@@ -980,6 +983,7 @@ def display_IT_results(byte_indexes, list_tuples_cfg):
         axes[i].set_title("byte index {}".format(i))
     # Global 
     f.tight_layout()
+    plt.show()
 
 def display_ttest_result(ttest_result, example_trace, title="Ttest results"):
     f = plt.figure()

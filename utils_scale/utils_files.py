@@ -9,7 +9,16 @@ TRAINING_DS=[f"./{RELATIVE_DIR_FILES_T}/training{i}/data.npz" for i in range(1)]
 TTEST_KF_DS=f"./{RELATIVE_DIR_FILES_T}/ttest-kf/data.npz"
 TTEST_PF_DS=f"./{RELATIVE_DIR_FILES_T}/ttest-pf/data.npz"
 
-def load_dataset(datafile_path, traces_dtype=np.float64, cropping=None, seed_shuffle=None):
+def I2keep(traces):
+    tmpm = np.mean(traces,axis=1)
+    mtmpm = np.mean(tmpm)
+    th = np.std(tmpm)
+    dst = np.abs(tmpm-mtmpm)
+    hig = dst>4*th
+    kept = np.where(np.logical_not(hig))[0]
+    return np.array(kept)
+
+def load_dataset(datafile_path, traces_dtype=np.float64, cropping=None, seed_shuffle=None, remove_first=False):
     """
     Open to file and load all the data fields from it. 
     """
@@ -22,6 +31,12 @@ def load_dataset(datafile_path, traces_dtype=np.float64, cropping=None, seed_shu
     if cropping is not None:
         [start, end] = cropping
         traces = traces[:,start:end]
+    if remove_first:
+        idx = I2keep(traces)
+        traces=traces[idx]
+        pts=pts[idx]
+        ks=ks[idx]
+        cts=cts[idx]
     ds = dict(
         traces=traces,
         pts=pts,

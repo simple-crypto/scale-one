@@ -71,16 +71,21 @@ def univariate_TA(traces, pts, pois, models):
     lprobas = maximum_likelihood(pts, log2pr_sb)
     return lprobas
 
-def explore_TA_univariate(dspath_train, dspaths_valid, qp, qas):
+def explore_TA_univariate(dspath_train, dspaths_valid, qp, qas, clean_dataset=False):
     ### TRAINING phase
     # First train using the training dataset 
-    ds = utils_files.load_dataset(dspath_train, seed_shuffle=0)
+    ds = utils_files.load_dataset(dspath_train, seed_shuffle=0, remove_first=clean_dataset)
+    # Fetch all dataset if no training complexity provided
+    if qp is None:
+        qpu = ds['traces'].shape[0]
+    else:
+        qpu = qp
     # Compute intermediate states 
-    classes = utils_aes.Sbox[ds["pts"][:qp] ^ ds["ks"][:qp]]
+    classes = utils_aes.Sbox[ds["pts"][:qpu] ^ ds["ks"][:qpu]]
     # Compute the POIs based on your function
-    pois = POI_selection_SNR(ds['traces'][:qp], classes, 256)
+    pois = POI_selection_SNR(ds['traces'][:qpu], classes, 256)
     # Compute the models
-    models = univariate_gaussian_models(ds['traces'][:qp], classes, pois[:,0])
+    models = univariate_gaussian_models(ds['traces'][:qpu], classes, pois[:,0])
     
     ### ONLINE Phase
     # Allocate memory for the results
@@ -99,7 +104,7 @@ def explore_TA_univariate(dspath_train, dspaths_valid, qp, qas):
 
     for dsi, dsp in enumerate(dspaths_valid):
         # Load the dataset
-        ds = utils_files.load_dataset(dsp, seed_shuffle=0)
+        ds = utils_files.load_dataset(dsp, seed_shuffle=0, remove_first=clean_dataset)
         correct_kbytes[dsi] = ds['ks'][0]
         for qavi, q_a in enumerate(qas):
             # Performs the template
@@ -108,7 +113,7 @@ def explore_TA_univariate(dspath_train, dspaths_valid, qp, qas):
             for vi, kc in enumerate(correct_kbytes[dsi]):
                 corrprobs[dsi, qavi, vi] = probas[vi,kc]
 
-    return (allprobs, corrprobs, qp, qas, correct_kbytes)
+    return (allprobs, corrprobs, qpu, qas, correct_kbytes)
 
 def multivariate_gaussian_models(traces, classes, pois, ndim):
     lda_acc = LdaAcc(nc=256, pois=pois.tolist())
@@ -122,19 +127,29 @@ def multivariate_LDA_TA(traces, pts, models):
     # return lprobas
     return lprobas
 
-def explore_TA_multivariate(dspath_train, dspaths_valid, qp, qas, npois, ndim, pois=None):
+def explore_TA_multivariate(dspath_train, dspaths_valid, qp, qas, npois, ndim, pois=None, fn_prof=None, fn_TA=None, clean_dataset=False):
+    # TODO: 
    ### TRAINING phase
     # First train using the training dataset 
-    ds = utils_files.load_dataset(dspath_train, seed_shuffle=0)
+    ds = utils_files.load_dataset(dspath_train, seed_shuffle=0, remove_first=clean_dataset)
+    # Fetch all dataset if no training complexity provided
+    if qp is None:
+        qpu = ds['traces'].shape[0]
+    else:
+        qpu = qp
     # Compute intermediate states 
-    classes = utils_aes.Sbox[ds["pts"][:qp] ^ ds["ks"][:qp]]
+    classes = utils_aes.Sbox[ds["pts"][:qpu] ^ ds["ks"][:qpu]]
     # Compute the POIs based on your function
     if pois is None:
-        poisu = POI_selection_SNR(ds['traces'][:qp], classes, 256)[:,:npois]
+        poisu = POI_selection_SNR(ds['traces'][:qpu], classes, 256)[:,:npois]
     else:
         poisu = pois
     # Compute the models
-    models = multivariate_gaussian_models(ds['traces'], classes, poisu, ndim)
+    if fn_prof is None:
+        models = multivariate_gaussian_models(ds['traces'][:qpu], classes[:qpu], poisu, ndim)
+    else:
+        models = fn_prof(ds['traces'][:qpu], classes[:qpu], poisu, ndim)
+
     
     ### ONLINE Phase
     # Allocate memory for the results
@@ -153,16 +168,20 @@ def explore_TA_multivariate(dspath_train, dspaths_valid, qp, qas, npois, ndim, p
 
     for dsi, dsp in enumerate(dspaths_valid):
         # Load the dataset
-        ds = utils_files.load_dataset(dsp, seed_shuffle=0)
+        ds = utils_files.load_dataset(dsp, seed_shuffle=0, remove_first=clean_dataset)
         correct_kbytes[dsi] = ds['ks'][0]
         for qavi, q_a in enumerate(qas):
             # Performs the template
-            probas = multivariate_LDA_TA(ds['traces'][:q_a], ds['pts'][:q_a], models )
+            if fn_TA is None:
+                probas = multivariate_LDA_TA(ds['traces'][:q_a], ds['pts'][:q_a], models )
+            else:
+                probas = fn_TA(ds['traces'][:q_a], ds['pts'][:q_a], models )
+                
             allprobs[dsi, qavi, :, :] = probas
             for vi, kc in enumerate(correct_kbytes[dsi]):
                 corrprobs[dsi, qavi, vi] = probas[vi,kc]
 
-    return (allprobs, corrprobs, qp, qas, correct_kbytes)
+    return (allprobs, corrprobs, qpu, qas, correct_kbytes)
 
 
 MY_COLORS = [
